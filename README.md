@@ -2,6 +2,10 @@
 
 A web app that connects people with similar music tastes at universities
 
+Please head to https://avhormauk.github.io/SoundCircle/index.html to see it live
+
+Note that in order to allow more users into the database, we would have to submit a quota extension request through spotify's developer dashboard, there will be a live demo showing how the user data submission works in our presentation
+
 ## Features
 
 - **Spotify Integration:** automatically pulls your top artists and currently playing tracks
