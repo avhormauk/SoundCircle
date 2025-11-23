@@ -1,6 +1,6 @@
 # SoundCircle
 
-A web application that connects people with similar music tastes at universities. Built for C^2Hacks Hackathon.
+A web app that connects people with similar music tastes at universities
 
 ## Features
 
