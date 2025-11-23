@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundCircle - Find Your Music Community</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="hero" id="heroSection">
+        <div class="hero-content">
+            <h1>🎵 SoundCircle</h1>
+            <p class="tagline">Find Your Music Community</p>
+            <p class="subtitle">Discover people around you who share your taste</p>
+            
+            <button id="connectSpotify" class="cta-button">
+                <span class="spotify-icon">🎧</span> Link Your Spotify
+            </button>
+            
+            <a href="discover.html" class="secondary-link">
+                Browse the community →
+            </a>
+
+            <div class="stats">
+                <p id="userCount">Loading community...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section hidden" id="formSection">
+        <div class="form-container">
+            <h2>Welcome! 🎉</h2>
+            <p>We found your music taste:</p>
+            
+            <div id="artistsDisplay" class="artists-display"></div>
+            
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="location">📍 Where are you?</label>
+                    <input type="text" id="location" placeholder="e.g., Berkeley, CA or UC Berkeley" required>
+                    <small>This helps you find nearby music buddies</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="contact">💬 How can people reach you? (optional)</label>
+                    <input type="text" id="contact" placeholder="e.g., @username on Instagram or Discord">
+                    <small>Leave blank if you want to stay anonymous</small>
+                </div>
+
+                <div class="privacy-note">
+                    <p>🔒 Your data will be visible to other users. We only share what you see here.</p>
+                </div>
+
+                <button type="submit" class="submit-button">Join the Community!</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // ===== CONFIGURATION =====
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyAbDk7yBcmoq1f7YispIZty1J7M9sg8ycU",
+            authDomain: "soundcircle-7ebd7.firebaseapp.com",
+            projectId: "soundcircle-7ebd7",
+            storageBucket: "soundcircle-7ebd7.firebasestorage.app",
+            messagingSenderId: "313939828422",
+            appId: "1:313939828422:web:3c45183871d17910b641c7"
+        };
+
+        const SPOTIFY_CLIENT_ID = '20e6dff041e1478694ba80cb2c952985';
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+        const SCOPES = 'user-top-read user-read-email';
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // ===== SPOTIFY AUTH =====
+        document.getElementById('connectSpotify').addEventListener('click', () => {
+            const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}`;
+            window.location.href = authUrl;
+        });
+
+        // ===== ON PAGE LOAD =====
+        window.onload = async function() {
+            // Show user count
+            loadUserCount();
+
+            // Check if returning from Spotify auth
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const token = params.get('access_token');
+            
+            if (token) {
+                // Clear hash from URL
+                history.replaceState(null, null, ' ');
+                await getUserData(token);
+            }
+        };
+
+        // ===== LOAD USER COUNT =====
+        async function loadUserCount() {
+            try {
+                const snapshot = await db.collection('users').get();
+                const count = snapshot.size;
+                document.getElementById('userCount').textContent = 
+                    `${count} ${count === 1 ? 'person has' : 'people have'} joined so far`;
+            } catch (error) {
+                console.error('Error loading count:', error);
+                document.getElementById('userCount').textContent = 'Join the growing community!';
+            }
+        }
+
+        // ===== GET SPOTIFY DATA =====
+        async function getUserData(token) {
+            try {
+                // Show loading
+                document.getElementById('heroSection').innerHTML = '<div class="hero-content"><h2>Loading your music taste... 🎵</h2></div>';
+
+                // Get user profile
+                const userRes = await fetch('https://api.spotify.com/v1/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const user = await userRes.json();
+
+                // Get top artists
+                const artistsRes = await fetch('https://api.spotify.com/v1/me/top/artists?limit=5&time_range=short_term', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const artistsData = await artistsRes.json();
+                
+                if (!artistsData.items || artistsData.items.length === 0) {
+                    alert('We couldn\'t find your top artists. Make sure you\'ve been listening to music on Spotify!');
+                    location.reload();
+                    return;
+                }
+
+                showForm(user, artistsData);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error connecting to Spotify. Please try again.');
+                location.reload();
+            }
+        }
+
+        // ===== SHOW FORM WITH SPOTIFY DATA =====
+        function showForm(user, artistsData) {
+            document.getElementById('heroSection').classList.add('hidden');
+            document.getElementById('formSection').classList.remove('hidden');
+            
+            const artists = artistsData.items.map(a => a.name);
+            document.getElementById('artistsDisplay').innerHTML = 
+                artists.map(a => `<span class="artist-tag">${a}</span>`).join('');
+            
+            // Store data for submission
+            window.userData = {
+                name: user.display_name || 'Anonymous User',
+                spotifyUrl: user.external_urls.spotify,
+                artists: artists,
+                spotifyId: user.id,
+                email: user.email
+            };
+        }
+
+        // ===== SUBMIT FORM =====
+        document.getElementById('userForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Joining...';
+            
+            const location = document.getElementById('location').value.trim();
+            const contact = document.getElementById('contact').value.trim();
+            
+            if (!location) {
+                alert('Please enter your location!');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Join the Community!';
+                return;
+            }
+            
+            try {
+                // Check if user already exists
+                const existingUser = await db.collection('users')
+                    .where('spotifyId', '==', window.userData.spotifyId)
+                    .get();
+
+                if (!existingUser.empty) {
+                    // Update existing user
+                    const docId = existingUser.docs[0].id;
+                    await db.collection('users').doc(docId).update({
+                        location: location,
+                        contact: contact,
+                        artists: window.userData.artists,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    // Add new user
+                    await db.collection('users').add({
+                        ...window.userData,
+                        location: location,
+                        contact: contact || null,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                
+                // Success!
+                alert('Welcome to SoundCircle! 🎉');
+                window.location.href = 'discover.html';
+                
+            } catch (error) {
+                console.error('Error saving:', error);
+                alert('Error saving data. Please try again.\n\n' + error.message);
+                submitButton.disabled = false;
+                submitButton.textContent = 'Join the Community!';
+            }
+        });
+    </script>
+</body>
+</html>

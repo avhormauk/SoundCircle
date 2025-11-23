@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover Your Music Community - SoundCircle</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="discover-page">
+    <div class="container">
+        <header class="page-header">
+            <h1>🎵 Your Music Community</h1>
+            <a href="index.html" class="back-link">← Add yourself</a>
+        </header>
+
+        <div class="filters">
+            <input type="text" id="searchLocation" placeholder="🔍 Filter by location..." class="filter-input">
+            <input type="text" id="searchArtist" placeholder="🔍 Filter by artist..." class="filter-input">
+            <button id="clearFilters" class="clear-btn">Clear</button>
+        </div>
+
+        <div class="stats-bar">
+            <p id="resultCount">Loading community...</p>
+        </div>
+
+        <div id="userGrid" class="user-grid">
+            <div class="loading">
+                <p>🎵 Loading your music community...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // ===== CONFIGURATION =====
+        // TODO: Replace with your Firebase config (same as index.html)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAbDk7yBcmoq1f7YispIZty1J7M9sg8ycU",
+            authDomain: "soundcircle-7ebd7.firebaseapp.com",
+            projectId: "soundcircle-7ebd7",
+            storageBucket: "soundcircle-7ebd7.firebasestorage.app",
+            messagingSenderId: "313939828422",
+            appId: "1:313939828422:web:3c45183871d17910b641c7"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let allUsers = [];
+        let filteredUsers = [];
+
+        // ===== LOAD USERS (REAL-TIME) =====
+        db.collection('users')
+            .orderBy('createdAt', 'desc')
+            .onSnapshot((snapshot) => {
+                allUsers = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                filteredUsers = [...allUsers];
+                displayUsers(filteredUsers);
+                updateStats(filteredUsers.length, allUsers.length);
+            }, (error) => {
+                console.error('Error loading users:', error);
+                document.getElementById('userGrid').innerHTML = `
+                    <div class="error">
+                        <p>❌ Error loading community data.</p>
+                        <p>Make sure Firebase is properly configured.</p>
+                    </div>
+                `;
+            });
+
+        // ===== DISPLAY USERS =====
+        function displayUsers(users) {
+            const grid = document.getElementById('userGrid');
+            
+            if (users.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <h2>🎵 No matches found</h2>
+                        <p>Try adjusting your filters or be the first to join!</p>
+                        <a href="index.html" class="cta-button">Join the Community</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = users.map(user => {
+                const artistsHTML = user.artists && user.artists.length > 0
+                    ? user.artists.slice(0, 3).map(a => `<span class="tag">${a}</span>`).join('')
+                    : '<span class="tag">Music Lover</span>';
+                
+                const contactHTML = user.contact 
+                    ? `<p class="contact">💬 ${user.contact}</p>` 
+                    : '<p class="contact-note">No contact shared</p>';
+
+                return `
+                    <div class="user-card" data-location="${user.location}" data-artists="${(user.artists || []).join(',')}">
+                        <div class="card-header">
+                            <h3>${user.name || 'Anonymous User'}</h3>
+                        </div>
+                        
+                        <p class="location">📍 ${user.location || 'Unknown Location'}</p>
+                        
+                        <div class="artists-section">
+                            <strong>Top Artists:</strong>
+                            <div class="artist-tags">
+                                ${artistsHTML}
+                            </div>
+                        </div>
+                        
+                        <div class="actions">
+                            ${user.spotifyUrl ? `<a href="${user.spotifyUrl}" target="_blank" rel="noopener" class="spotify-link">🎧 Spotify Profile</a>` : ''}
+                            ${contactHTML}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ===== UPDATE STATS =====
+        function updateStats(shown, total) {
+            const resultCount = document.getElementById('resultCount');
+            if (shown === total) {
+                resultCount.textContent = `Showing all ${total} ${total === 1 ? 'member' : 'members'}`;
+            } else {
+                resultCount.textContent = `Showing ${shown} of ${total} members`;
+            }
+        }
+
+        // ===== FILTER FUNCTIONALITY =====
+        function filterUsers() {
+            const locationQuery = document.getElementById('searchLocation').value.toLowerCase().trim();
+            const artistQuery = document.getElementById('searchArtist').value.toLowerCase().trim();
+            
+            filteredUsers = allUsers.filter(user => {
+                const matchesLocation = !locationQuery || 
+                    (user.location && user.location.toLowerCase().includes(locationQuery));
+                
+                const matchesArtist = !artistQuery || 
+                    (user.artists && user.artists.some(a => a.toLowerCase().includes(artistQuery)));
+                
+                return matchesLocation && matchesArtist;
+            });
+            
+            displayUsers(filteredUsers);
+            updateStats(filteredUsers.length, allUsers.length);
+        }
+
+        // Add event listeners for filters
+        document.getElementById('searchLocation').addEventListener('input', filterUsers);
+        document.getElementById('searchArtist').addEventListener('input', filterUsers);
+
+        // Clear filters
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            document.getElementById('searchLocation').value = '';
+            document.getElementById('searchArtist').value = '';
+            filterUsers();
+        });
+    </script>
+</body>
+</html>
