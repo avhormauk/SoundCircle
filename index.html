@@ -147,6 +147,9 @@
             try {
                 document.getElementById('heroSection').innerHTML = '<div class="hero-content"><h2>Loading your music taste... 🎵</h2></div>';
                 
+                console.log('Exchanging code for token...');
+                console.log('Redirect URI being used:', REDIRECT_URI);
+                
                 const response = await fetch('https://accounts.spotify.com/api/token', {
                     method: 'POST',
                     headers: {
@@ -162,15 +165,17 @@
                 });
 
                 const data = await response.json();
+                console.log('Token response:', data);
                 
                 if (data.access_token) {
                     await getUserData(data.access_token);
                 } else {
-                    throw new Error('No access token received');
+                    console.error('Token exchange failed:', data);
+                    throw new Error(data.error_description || 'No access token received');
                 }
             } catch (error) {
                 console.error('Error exchanging code:', error);
-                alert('Error connecting to Spotify. Please try again.');
+                alert('Error connecting to Spotify: ' + error.message + '\n\nCheck the console (F12) for more details.');
                 location.reload();
             }
         }
